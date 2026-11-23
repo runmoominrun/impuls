@@ -130,7 +130,7 @@
     padding-bottom: 8px; border-bottom: 2px solid currentColor;
   }
   .slider-title.red { color: #c53030; }
-  .slider-title.green { color: #276749; }
+  .slider-title.green { color: #38a169; }
 
   .slider-row { display: flex; flex-direction: column; gap: 4px; }
   .slider-row .label {
@@ -232,6 +232,7 @@
     <div class="card">
       <div class="controls">
         <button id="startBtn">Старт</button>
+        <button id="pauseBtn" class="reset" disabled>Пауза</button>
         <button id="resetBtn" class="reset">Сброс</button>
         <button id="soundBtn" class="icon-btn" title="Звук удара">🔊</button>
         <label class="slow">
@@ -311,6 +312,7 @@
     curV1: 0, curV2: 0,
     running: false,
     finished: false,
+    paused: false,
     hasCollided: false,
     mode: 'elastic',
     slow: false,
@@ -426,6 +428,7 @@
     v2: document.getElementById('v2'),
     v2v: document.getElementById('v2v'),
     startBtn: document.getElementById('startBtn'),
+    pauseBtn: document.getElementById('pauseBtn'),
     resetBtn: document.getElementById('resetBtn'),
     soundBtn: document.getElementById('soundBtn'),
     slowChk: document.getElementById('slowChk'),
@@ -465,6 +468,7 @@
 
   function resetToInitial() {
     state.running = false;
+    state.paused = false;
     state.finished = false;
     state.hasCollided = false;
     state.afterV1 = null;
@@ -486,6 +490,8 @@
 
     clearResults();
     ui.startBtn.disabled = false;
+    ui.pauseBtn.disabled = true;
+    ui.pauseBtn.textContent = 'Пауза';
     setStatus('Нажмите «Старт»');
     draw(0);
   }
@@ -521,6 +527,17 @@
 
   ui.startBtn.addEventListener('click', () => {
     if (state.running) return;
+    if (state.paused) {
+      state.paused = false;
+      state.running = true;
+      ui.startBtn.disabled = true;
+      ui.startBtn.textContent = 'Старт';
+      ui.pauseBtn.disabled = false;
+      setStatus(state.hasCollided ? (state.mode === 'elastic' ? 'Упругое соударение' : 'Пластичное соударение') : 'Движение...');
+      state.lastTime = performance.now();
+      ensureLoop();
+      return;
+    }
     readSliders();
     initAudio();
 
@@ -531,6 +548,7 @@
     state.x1 = 6.0;
     state.x2 = 14.0;
     state.hasCollided = false;
+    state.paused = false;
     state.finished = false;
     state.afterV1 = null;
     state.afterV2 = null;
@@ -545,9 +563,22 @@
 
     state.running = true;
     ui.startBtn.disabled = true;
+    ui.startBtn.textContent = 'Старт';
+    ui.pauseBtn.disabled = false;
+    ui.pauseBtn.textContent = 'Пауза';
     setStatus('Движение...');
     state.lastTime = performance.now();
     ensureLoop();
+  });
+
+  ui.pauseBtn.addEventListener('click', () => {
+    if (!state.running) return;
+    state.running = false;
+    state.paused = true;
+    ui.pauseBtn.disabled = true;
+    setStatus('Анимация на паузе. Нажмите «Старт» для продолжения.');
+    ui.startBtn.disabled = false;
+    ui.startBtn.textContent = 'Продолжить';
   });
 
   ui.resetBtn.addEventListener('click', resetToInitial);
@@ -714,6 +745,8 @@
       if (fullyOut(state.x1) && fullyOut(state.x2)) {
         state.finished = true;
         state.running = false;
+        ui.pauseBtn.disabled = true;
+        ui.startBtn.disabled = true;
         setStatus('Тележки выехали за пределы поля. Нажмите «Сброс».');
       }
     } else {
@@ -721,6 +754,7 @@
       if ((outOfVisible(state.x1) || outOfVisible(state.x2)) && !canStillCollide()) {
         state.finished = true;
         state.running = false;
+        ui.pauseBtn.disabled = true;
         ui.startBtn.disabled = false;
         setStatus('Тележки не столкнутся. Нажмите «Сброс».');
       }
